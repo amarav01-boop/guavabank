@@ -6,6 +6,7 @@ const validInput: KycInput = {
   name: "Maria da Silva",
   document: "11144477735",
   birthDate: "1990-05-20",
+  evaluationDate: "2026-11-02",
   declaredDocumentName: "Maria da Silva",
   documents: [
     { type: "ID_FRONT", fileName: "id-front.png", contentHash: "hash-front", mimeType: "image/png", sizeBytes: 1000 },
@@ -37,6 +38,21 @@ describe("SimulatedKycProvider", () => {
     await expect(provider.evaluate({ ...validInput, document: "00000000000" })).resolves.toMatchObject({
       status: "REJECTED"
     });
+  });
+
+  it("rejeita documentos não suportados", async () => {
+    await expect(provider.evaluate({ ...validInput, document: "11144477736" })).resolves.toMatchObject({
+      status: "REJECTED"
+    });
+  });
+
+  it("mantém a idade determinística na data de aniversário", async () => {
+    const input = { ...validInput, birthDate: "2008-11-03" };
+    const beforeBirthday = await provider.evaluate({ ...input, evaluationDate: "2026-11-02" });
+    const onBirthday = await provider.evaluate({ ...input, evaluationDate: "2026-11-03" });
+
+    expect(beforeBirthday.status).toBe("REJECTED");
+    expect(onBirthday.status).toBe("APPROVED");
   });
 
   it("produz o mesmo resultado para o mesmo input", async () => {

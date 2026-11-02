@@ -20,6 +20,7 @@ export type KycInput = {
   name: string;
   document: string;
   birthDate: string;
+  evaluationDate: string;
   declaredDocumentName?: string;
   documents: KycDocumentInput[];
 };

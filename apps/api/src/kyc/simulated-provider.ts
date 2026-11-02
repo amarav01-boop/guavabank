@@ -15,8 +15,9 @@ function isValidDate(value: string): boolean {
   return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
 }
 
-function ageFromBirthDate(value: string, today = new Date()): number {
+function ageFromBirthDate(value: string, evaluationDate: string): number {
   const birthDate = new Date(`${value}T00:00:00.000Z`);
+  const today = new Date(`${evaluationDate}T00:00:00.000Z`);
   let age = today.getUTCFullYear() - birthDate.getUTCFullYear();
   const birthdayNotReached =
     today.getUTCMonth() < birthDate.getUTCMonth() ||
@@ -66,7 +67,10 @@ export class SimulatedKycProvider implements KycProvider {
       reasonCode: hasIdentityDocuments ? undefined : "IDENTITY_DOCUMENTS_REQUIRED"
     });
 
-    const isAdult = isValidDate(input.birthDate) && ageFromBirthDate(input.birthDate) >= 18;
+    const isAdult =
+      isValidDate(input.birthDate) &&
+      isValidDate(input.evaluationDate) &&
+      ageFromBirthDate(input.birthDate, input.evaluationDate) >= 18;
     checks.push({
       type: "AGE",
       status: isAdult ? "PASSED" : "FAILED",
@@ -84,10 +88,10 @@ export class SimulatedKycProvider implements KycProvider {
 
     if (input.document === SYNTHETIC_REJECTED_DOCUMENT) {
       checks.push({ type: "SYNTHETIC_DOCUMENT", status: "FAILED", reasonCode: "DOCUMENT_REJECTED" });
-    }
-
-    if (input.document === SYNTHETIC_REVIEW_DOCUMENT) {
+    } else if (input.document === SYNTHETIC_REVIEW_DOCUMENT) {
       checks.push({ type: "SYNTHETIC_DOCUMENT", status: "REVIEW", reasonCode: "DOCUMENT_REQUIRES_REVIEW" });
+    } else if (input.document !== SYNTHETIC_APPROVED_DOCUMENT) {
+      checks.push({ type: "SYNTHETIC_DOCUMENT", status: "FAILED", reasonCode: "UNSUPPORTED_DOCUMENT" });
     }
 
     if (checks.some((check) => check.status === "FAILED")) {
