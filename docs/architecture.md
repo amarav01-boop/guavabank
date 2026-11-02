@@ -10,7 +10,10 @@ O sistema representa um banco digital fictício para desenvolvimento e testes. N
 
 - `User`: credenciais e estado de acesso.
 - `Customer`: dados cadastrais mínimos.
-- `KycCase`: status `PENDING`, `APPROVED` ou `REJECTED`.
+- `KycCase`: status `PENDING`, `PROCESSING`, `APPROVED`, `REJECTED` ou `MANUAL_REVIEW`.
+- `KycDocument`: metadados e hash de documentos sintéticos; o arquivo não é persistido no MVP.
+- `KycCheck`: resultado de cada regra automatizada.
+- `KycDecision`: histórico imutável das decisões do caso.
 - O aprovador inicial será uma regra determinística de teste ou endpoint administrativo local.
 - Somente KYC aprovado pode abrir conta e enviar Pix.
 
@@ -38,7 +41,7 @@ Account 1──N PixTransfer
 PixTransfer 1──N AuditEvent
 ```
 
-Entidades mínimas: `User`, `Customer`, `KycCase`, `Account`, `LedgerEntry`, `PixKey`, `PixTransfer` e `AuditEvent`.
+Entidades mínimas: `User`, `Customer`, `KycCase`, `KycDocument`, `KycCheck`, `KycDecision`, `Account`, `LedgerEntry`, `PixKey`, `PixTransfer` e `AuditEvent`.
 
 ## API inicial
 

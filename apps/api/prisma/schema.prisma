@@ -1,0 +1,221 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum KycStatus {
+  PENDING
+  PROCESSING
+  APPROVED
+  REJECTED
+  MANUAL_REVIEW
+}
+
+enum KycDocumentType {
+  ID_FRONT
+  ID_BACK
+  SELFIE
+  PROOF_OF_ADDRESS
+}
+
+enum KycCheckType {
+  DATA_COMPLETENESS
+  DOCUMENT_METADATA
+  SYNTHETIC_DOCUMENT
+  AGE
+  NAME_MATCH
+}
+
+enum KycCheckStatus {
+  PASSED
+  FAILED
+  REVIEW
+}
+
+enum KycDecisionOutcome {
+  APPROVED
+  REJECTED
+  MANUAL_REVIEW
+}
+
+enum AccountStatus {
+  ACTIVE
+  BLOCKED
+  CLOSED
+}
+
+enum PixKeyType {
+  CPF
+  EMAIL
+  PHONE
+  RANDOM
+}
+
+enum LedgerEntryType {
+  CREDIT
+  DEBIT
+}
+
+enum PixTransferStatus {
+  CREATED
+  PROCESSING
+  COMPLETED
+  REJECTED
+  CANCELED
+}
+
+model User {
+  id           String        @id @default(cuid())
+  email        String        @unique
+  passwordHash String
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  customer     Customer?
+  auditEvents  AuditEvent[]
+}
+
+model Customer {
+  id           String    @id @default(cuid())
+  userId       String    @unique
+  name         String
+  documentHash String    @unique
+  birthDate    DateTime
+  createdAt    DateTime  @default(now())
+  user         User      @relation(fields: [userId], references: [id])
+  kycCase      KycCase?
+  account      Account?
+}
+
+model KycCase {
+  id          String    @id @default(cuid())
+  customerId  String    @unique
+  status      KycStatus @default(PENDING)
+  reason      String?
+  submittedAt DateTime  @default(now())
+  reviewedAt  DateTime?
+  customer    Customer  @relation(fields: [customerId], references: [id])
+  documents   KycDocument[]
+  checks      KycCheck[]
+  decisions   KycDecision[]
+}
+
+model KycDocument {
+  id           String          @id @default(cuid())
+  kycCaseId    String
+  type         KycDocumentType
+  fileName     String
+  contentHash  String
+  mimeType     String
+  sizeBytes    Int
+  createdAt    DateTime        @default(now())
+  kycCase      KycCase         @relation(fields: [kycCaseId], references: [id])
+
+  @@unique([kycCaseId, type])
+  @@index([contentHash])
+}
+
+model KycCheck {
+  id          String         @id @default(cuid())
+  kycCaseId   String
+  type        KycCheckType
+  status      KycCheckStatus
+  reasonCode  String?
+  detailsJson String?
+  createdAt   DateTime       @default(now())
+  kycCase     KycCase        @relation(fields: [kycCaseId], references: [id])
+
+  @@index([kycCaseId, createdAt])
+}
+
+model KycDecision {
+  id          String             @id @default(cuid())
+  kycCaseId   String
+  outcome     KycDecisionOutcome
+  reason      String?
+  decidedBy   String?
+  createdAt   DateTime           @default(now())
+  kycCase     KycCase            @relation(fields: [kycCaseId], references: [id])
+
+  @@index([kycCaseId, createdAt])
+}
+
+model Account {
+  id                String        @id @default(cuid())
+  customerId        String        @unique
+  number            String        @unique
+  status            AccountStatus @default(ACTIVE)
+  createdAt         DateTime      @default(now())
+  customer          Customer      @relation(fields: [customerId], references: [id])
+  ledgerEntries     LedgerEntry[]
+  pixKeys           PixKey[]
+  sentTransfers     PixTransfer[] @relation("SenderAccount")
+  receivedTransfers PixTransfer[] @relation("ReceiverAccount")
+}
+
+model LedgerEntry {
+  id            String          @id @default(cuid())
+  accountId     String
+  type          LedgerEntryType
+  amountCents   Int
+  referenceType String
+  referenceId   String
+  createdAt     DateTime        @default(now())
+  account       Account         @relation(fields: [accountId], references: [id])
+
+  @@index([accountId, createdAt])
+  @@index([referenceType, referenceId])
+}
+
+model PixKey {
+  id          String    @id @default(cuid())
+  accountId   String
+  type        PixKeyType
+  valueHash   String
+  valueMasked String
+  active      Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  account     Account   @relation(fields: [accountId], references: [id])
+
+  @@unique([type, valueHash])
+  @@index([accountId, active])
+}
+
+model PixTransfer {
+  id                String            @id @default(cuid())
+  senderAccountId   String
+  receiverAccountId String
+  amountCents       Int
+  status            PixTransferStatus @default(CREATED)
+  endToEndId        String            @unique
+  idempotencyKey    String
+  description       String?
+  failureReason     String?
+  createdAt         DateTime          @default(now())
+  completedAt       DateTime?
+  sender            Account           @relation("SenderAccount", fields: [senderAccountId], references: [id])
+  receiver          Account           @relation("ReceiverAccount", fields: [receiverAccountId], references: [id])
+  auditEvents       AuditEvent[]
+
+  @@unique([senderAccountId, idempotencyKey])
+  @@index([senderAccountId, createdAt])
+  @@index([receiverAccountId, createdAt])
+}
+
+model AuditEvent {
+  id           String        @id @default(cuid())
+  actorUserId  String?
+  pixTransferId String?
+  action       String
+  entityType   String
+  entityId     String
+  metadataJson String?
+  createdAt    DateTime      @default(now())
+  actor        User?         @relation(fields: [actorUserId], references: [id])
+  pixTransfer  PixTransfer?  @relation(fields: [pixTransferId], references: [id])
+
+  @@index([entityType, entityId, createdAt])
+}
